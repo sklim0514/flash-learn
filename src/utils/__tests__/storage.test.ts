@@ -1,69 +1,112 @@
-/**
- * localStorage 유틸 함수 테스트
- * 브라우저 콘솔에서 수동으로 실행 가능
- */
+import { describe, it, expect, beforeEach } from 'vitest'
+import { getFromStorage, setToStorage, removeFromStorage, isStorageAvailable, clearAllStorage } from '../storage'
+import { STORAGE_KEYS } from '../../types'
 
-import { getFromStorage, setToStorage, removeFromStorage, isStorageAvailable } from '../storage';
-import { STORAGE_KEYS } from '../../types';
+describe('storage utils', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
 
-export function runStorageTests() {
-  console.log('=== localStorage 유틸 테스트 시작 ===\n');
+  describe('isStorageAvailable', () => {
+    it('localStorage가 사용 가능하면 true를 반환한다', () => {
+      expect(isStorageAvailable()).toBe(true)
+    })
+  })
 
-  // 1. isStorageAvailable 테스트
-  console.log('1. isStorageAvailable 테스트');
-  const available = isStorageAvailable();
-  console.log(`✓ localStorage 사용 가능: ${available}\n`);
+  describe('setToStorage', () => {
+    it('데이터를 localStorage에 저장한다', () => {
+      const testData = { id: 'test', value: 123 }
+      setToStorage(STORAGE_KEYS.DECKS, testData)
+      
+      const stored = localStorage.getItem(STORAGE_KEYS.DECKS)
+      expect(stored).toBe(JSON.stringify(testData))
+    })
 
-  if (!available) {
-    console.error('localStorage를 사용할 수 없습니다.');
-    return;
-  }
+    it('복잡한 객체를 저장할 수 있다', () => {
+      const complexData = {
+        id: 'travel',
+        title: '여행',
+        items: ['passport', 'ticket'],
+        nested: { key: 'value' }
+      }
+      
+      setToStorage(STORAGE_KEYS.CARDS, complexData)
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEYS.CARDS)!)
+      expect(stored).toEqual(complexData)
+    })
+  })
 
-  // 2. setToStorage 테스트
-  console.log('2. setToStorage 테스트');
-  const testData = { test: 'value', number: 123 };
-  setToStorage(STORAGE_KEYS.DECKS, testData);
-  console.log(`✓ fc.decks에 데이터 저장 완료\n`);
+  describe('getFromStorage', () => {
+    it('localStorage에서 데이터를 가져온다', () => {
+      const testData = { id: 'test', value: 456 }
+      localStorage.setItem(STORAGE_KEYS.DECKS, JSON.stringify(testData))
+      
+      const retrieved = getFromStorage(STORAGE_KEYS.DECKS)
+      expect(retrieved).toEqual(testData)
+    })
 
-  // 3. getFromStorage 테스트
-  console.log('3. getFromStorage 테스트');
-  const retrieved = getFromStorage<typeof testData>(STORAGE_KEYS.DECKS);
-  const match = JSON.stringify(retrieved) === JSON.stringify(testData);
-  console.log(`✓ 데이터 읽기: ${match ? '성공' : '실패'}`);
-  console.log(`  저장된 값: ${JSON.stringify(testData)}`);
-  console.log(`  읽은 값: ${JSON.stringify(retrieved)}\n`);
+    it('데이터가 없으면 null을 반환한다', () => {
+      const result = getFromStorage('non-existent-key')
+      expect(result).toBeNull()
+    })
 
-  // 4. removeFromStorage 테스트
-  console.log('4. removeFromStorage 테스트');
-  removeFromStorage(STORAGE_KEYS.DECKS);
-  const afterRemove = getFromStorage(STORAGE_KEYS.DECKS);
-  console.log(`✓ 데이터 삭제: ${afterRemove === null ? '성공' : '실패'}`);
-  console.log(`  삭제 후 값: ${afterRemove}\n`);
+    it('잘못된 JSON이면 null을 반환한다', () => {
+      localStorage.setItem('bad-key', 'invalid json{')
+      const result = getFromStorage('bad-key')
+      expect(result).toBeNull()
+    })
+  })
 
-  // 5. 실제 키로 테스트
-  console.log('5. 실제 STORAGE_KEYS로 통합 테스트');
-  const testDecks = [{ id: 'test', title: 'Test Deck', size: 10 }];
-  const testCards = [{ id: 'c1', deckId: 'test', front_en: 'hello', back_ko: '안녕' }];
+  describe('removeFromStorage', () => {
+    it('localStorage에서 데이터를 삭제한다', () => {
+      const testData = { id: 'test' }
+      localStorage.setItem(STORAGE_KEYS.DECKS, JSON.stringify(testData))
+      
+      removeFromStorage(STORAGE_KEYS.DECKS)
+      expect(localStorage.getItem(STORAGE_KEYS.DECKS)).toBeNull()
+    })
+  })
 
-  setToStorage(STORAGE_KEYS.DECKS, testDecks);
-  setToStorage(STORAGE_KEYS.CARDS, testCards);
-  
-  const loadedDecks = getFromStorage(STORAGE_KEYS.DECKS);
-  const loadedCards = getFromStorage(STORAGE_KEYS.CARDS);
-  
-  console.log(`✓ fc.decks 저장/로드: ${loadedDecks ? '성공' : '실패'}`);
-  console.log(`✓ fc.cards 저장/로드: ${loadedCards ? '성공' : '실패'}\n`);
+  describe('clearAllStorage', () => {
+    it('모든 플래시카드 데이터를 삭제한다', () => {
+      setToStorage(STORAGE_KEYS.DECKS, { test: 1 })
+      setToStorage(STORAGE_KEYS.CARDS, { test: 2 })
+      setToStorage(STORAGE_KEYS.STATS, { test: 3 })
+      setToStorage(STORAGE_KEYS.LAST_SESSION, { test: 4 })
+      
+      clearAllStorage()
+      
+      expect(getFromStorage(STORAGE_KEYS.DECKS)).toBeNull()
+      expect(getFromStorage(STORAGE_KEYS.CARDS)).toBeNull()
+      expect(getFromStorage(STORAGE_KEYS.STATS)).toBeNull()
+      expect(getFromStorage(STORAGE_KEYS.LAST_SESSION)).toBeNull()
+    })
+  })
 
-  // 정리
-  removeFromStorage(STORAGE_KEYS.DECKS);
-  removeFromStorage(STORAGE_KEYS.CARDS);
+  describe('통합 테스트', () => {
+    it('데이터 저장, 로드, 삭제가 정상 동작한다', () => {
+      const decks = [
+        { id: 'travel', title: '여행', size: 20 }
+      ]
+      const cards = [
+        { id: 't1', deckId: 'travel', front_en: 'passport', back_ko: '여권' }
+      ]
 
-  console.log('=== 모든 테스트 완료 ===');
-  console.log('수용 기준 충족: ✓ fc.decks, fc.cards 키로 저장/로드 테스트 통과');
-}
+      // 저장
+      setToStorage(STORAGE_KEYS.DECKS, decks)
+      setToStorage(STORAGE_KEYS.CARDS, cards)
 
-// 브라우저 콘솔에서 window.runStorageTests() 로 실행 가능하도록 export
-if (typeof window !== 'undefined') {
-  (window as any).runStorageTests = runStorageTests;
-}
+      // 로드
+      const loadedDecks = getFromStorage(STORAGE_KEYS.DECKS)
+      const loadedCards = getFromStorage(STORAGE_KEYS.CARDS)
 
+      expect(loadedDecks).toEqual(decks)
+      expect(loadedCards).toEqual(cards)
+
+      // 삭제
+      removeFromStorage(STORAGE_KEYS.DECKS)
+      expect(getFromStorage(STORAGE_KEYS.DECKS)).toBeNull()
+      expect(getFromStorage(STORAGE_KEYS.CARDS)).toEqual(cards) // 다른 키는 유지
+    })
+  })
+})
